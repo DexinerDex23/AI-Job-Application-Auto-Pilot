@@ -1,0 +1,394 @@
+{
+  "name": "AI Job Application Auto-Pilot",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "url"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "id": "c309f2e4-1da4-4f54-95bb-fa1284ce0c04",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        240
+      ],
+      "notes": "Step 1: Connect your Job Search Sheet here."
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "candidate_name",
+              "value": "YOUR_NAME_HERE"
+            },
+            {
+              "name": "cv_text",
+              "value": "PASTE_YOUR_FULL_CV_TEXT_HERE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-4789-8012-34567890abcdef",
+      "name": "Load Candidate Profile",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -620,
+        240
+      ],
+      "notes": "Step 2: Paste your CV text here ONCE."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"model\": \"llama3.2:3b\",\n    \"format\": \"json\",\n    \"stream\": false,\n    \"prompt\": \"You are an elite technical career strategist. Analyze the following Job Description against the candidate's CV. Score the match from 1 to 10 based on acceptance probability.\\n\\nJOB DESCRIPTION:\\n\" + $('Google Sheets Trigger').item.json.Description + \"\\n\\nCANDIDATE CV:\\n\" + $json.cv_text + \"\\n\\nOutput ONLY a valid JSON object using exactly this schema:\\n{\\n  \\\"score\\\": 8,\\n  \\\"missing_requirements\\\": \\\"List 2-3 missing skills\\\",\\n  \\\"hit_requirements\\\": \\\"List 2-3 matching skills\\\",\\n  \\\"notes\\\": \\\"Brief strategic analysis of the match.\\\"\\n}\"\n  }\n}}",
+        "options": {}
+      },
+      "id": "56d64fc9-4778-457c-92e3-e36a15d596f6",
+      "name": "Ollama Analyzer & Scorer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -360,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ JSON.parse($json.response).score }}",
+              "operation": "largerEqual",
+              "value2": 6
+            }
+          ]
+        }
+      },
+      "id": "e1773e84-e29f-4457-aef1-2c779399ab8a",
+      "name": "The Gatekeeper (IF Node)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        240
+      ],
+      "notes": "Filters out low relevance jobs (< 6/10)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"model\": \"llama3.2:3b\",\n    \"format\": \"json\",\n    \"stream\": false,\n    \"prompt\": \"You are an expert career coach. The candidate scored \" + JSON.parse($node[\"Ollama Analyzer & Scorer\"].json.response).score + \" out of 10 for this role. \\n\\nJOB DESCRIPTION:\\n\" + $('Google Sheets Trigger').item.json.Description + \"\\n\\nCANDIDATE CV:\\n\" + $('Load Candidate Profile').item.json.cv_text + \"\\n\\nTASK 1: Write a highly persuasive 4-paragraph Motivation Letter.\\nTASK 2: Rewrite 3 key bullets from the candidate's CV using the XYZ formula (Accomplished X as measured by Y, by doing Z) to match this specific job.\\n\\nOutput ONLY a valid JSON object using exactly this schema:\\n{\\n  \\\"motivation_letter\\\": \\\"Paragraph 1...\\\\n\\\\nParagraph 2...\\\\n\\\\nParagraph 3...\\\\n\\\\nParagraph 4...\\\",\\n  \\\"cv_ats_bullets\\\": \\\"- Bullet 1\\\\n- Bullet 2\\\\n- Bullet 3\\\"\\n}\"\n  }\n}}",
+        "options": {}
+      },
+      "id": "6df7d050-e40e-4890-bd96-56a17b95b0d9",
+      "name": "Ollama CV & Motivation Letter Writer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        140,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "job_title",
+              "name": "Job Title",
+              "value": "={{ $('Google Sheets Trigger').item.json[\"Job Title\"] }}",
+              "type": "string"
+            },
+            {
+              "id": "company",
+              "name": "Company Name",
+              "value": "={{ $('Google Sheets Trigger').item.json[\"Company\"] }}",
+              "type": "string"
+            },
+            {
+              "id": "url",
+              "name": "Link",
+              "value": "={{ $('Google Sheets Trigger').item.json[\"Url\"] }}",
+              "type": "string"
+            },
+            {
+              "id": "platform",
+              "name": "Platform",
+              "value": "={{ $('Google Sheets Trigger').item.json[\"Platfrom Applied From\"] }}",
+              "type": "string"
+            },
+            {
+              "id": "score",
+              "name": "Score",
+              "value": "={{ JSON.parse($('Ollama Analyzer & Scorer').item.json.response).score }}",
+              "type": "string"
+            },
+            {
+              "id": "notes",
+              "name": "Notes",
+              "value": "={{ JSON.parse($('Ollama Analyzer & Scorer').item.json.response).notes }}",
+              "type": "string"
+            },
+            {
+              "id": "letter",
+              "name": "Motivation Letter",
+              "value": "={{ JSON.parse($json.response).motivation_letter }}",
+              "type": "string"
+            },
+            {
+              "id": "bullets",
+              "name": "CV ATS",
+              "value": "={{ JSON.parse($json.response).cv_ats_bullets }}",
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "name": "Date Applied",
+              "value": "={{ $now.format('yyyy-MM-dd') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d1354a2a-45c1-4b19-9130-1c10729352e0",
+      "name": "Consolidate Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "url"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Job Title": "={{ $json[\"Job Title\"] }}",
+            "Company Name": "={{ $json[\"Company Name\"] }}",
+            "Link": "={{ $json[\"Link\"] }}",
+            "Platform": "={{ $json[\"Platform\"] }}",
+            "Score": "={{ $json[\"Score\"] }}",
+            "Notes": "={{ $json[\"Notes\"] }}",
+            "Motivation Letter": "={{ $json[\"Motivation Letter\"] }}",
+            "CV ATS": "={{ $json[\"CV ATS\"] }}",
+            "Status": "Ready to Apply",
+            "Date Applied": "={{ $json[\"Date Applied\"] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Link",
+              "displayName": "Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Platform",
+              "displayName": "Platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Motivation Letter",
+              "displayName": "Motivation Letter",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CV ATS",
+              "displayName": "CV ATS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date Applied",
+              "displayName": "Date Applied",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "b1387775-1284-4906-b8d1-464c7e505faa",
+      "name": "Application Google Sheets (Output)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [
+        620,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Load Candidate Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Candidate Profile": {
+      "main": [
+        [
+          {
+            "node": "Ollama Analyzer & Scorer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Analyzer & Scorer": {
+      "main": [
+        [
+          {
+            "node": "The Gatekeeper (IF Node)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "The Gatekeeper (IF Node)": {
+      "main": [
+        [
+          {
+            "node": "Ollama CV & Motivation Letter Writer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama CV & Motivation Letter Writer": {
+      "main": [
+        [
+          {
+            "node": "Consolidate Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidate Data": {
+      "main": [
+        [
+          {
+            "node": "Application Google Sheets (Output)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
